@@ -1,17 +1,8 @@
 #!/usr/bin/env python
-# Code from: https://siglentna.com/application-note/programming-example-sds-oscilloscope-screen-capture-python/?pdf=8354
+# Based heavily on code from: https://siglentna.com/application-note/programming-example-sds-oscilloscope-screen-capture-python/?pdf=8354
 #-*- coding:utf-8 –*-
 #-----------------------------------------------------------------------------
-#The short script is a example that open a socket, sends a query to return a
-#screen dump from the scope, saves the screen dump as a BMP in the python folder,
-#and closes the socket.
-#
-#Currently tested on SDS1000X-E,2000X-E, and 5000X models
-#
-#No warranties expressed or implied
-#
-#SIGLENT/JAC 03.2019
-#
+#The short script is a example that open a socket, sends a query #and closes the socket.
 #-----------------------------------------------------------------------------
 import socket # for sockets
 import sys # for exit
@@ -20,7 +11,10 @@ import time # for sleep
  
 remote_ip = "192.168.0.135" # should match the instrument’s IP address
 port = 5025 # the port number of the instrument service
- 
+SOCKET_CLOSE_DELAY = 5
+SOCKET_QUERY_DELAY = 1
+SOCKET_RECEIVE_DELAY = 0.01
+
 def SocketConnect():
     try:
         #create an AF_INET, STREAM socket (TCP)
@@ -42,7 +36,7 @@ def SocketQuery(Sock, cmd):
         #Send cmd string
         Sock.sendall(cmd)
         Sock.sendall(b'\n') #Command termination
-        time.sleep(1)
+        time.sleep(SOCKET_QUERY_DELAY)
     except socket.error:
         #Send failed
         print ('Send failed')
@@ -51,7 +45,7 @@ def SocketQuery(Sock, cmd):
     data_body = bytes() 
     while True:
         try:
-            time.sleep(0.01)
+            time.sleep(SOCKET_RECEIVE_DELAY)
             server_replay = Sock.recv(8000)
             #print(len(server_replay))
             data_body += server_replay
@@ -59,44 +53,30 @@ def SocketQuery(Sock, cmd):
             print("data received complete..")
             break
     return data_body
-    '''
-    PACK_LEN = 768067#the packet length you will receive;
-    #SDS5000X is 2457659;SDS1000X-E/2000X-E is 768067
-    had_received = 0    
-    data_body = bytes() 
-    while had_received &amp;lt; PACK_LEN:
-        part_body= Sock.recv(PACK_LEN - had_received)
-        data_body +=  part_body
-        part_body_length = len(part_body)
-        #print('part_body_length', part_body_length)
-        had_received += part_body_length
-    return data_body
-    '''
- 
  
 def SocketClose(Sock):
     #close the socket
     Sock.close()
-    time.sleep(5)
+    time.sleep(SOCKET_CLOSE_DELAY)
  
 def main():
     global remote_ip
     global port
     global count
  
-    #Open a file
-    file_name = "SCDP.bmp"
+    # Open a socket, query the scope, save and close socket
+#    s = SocketConnect()
+    for i in range(100):
+        s = SocketConnect()
+        print("iteration: " + str(i))
+        #qStr = SocketQuery(s, b'*IDN?') #Request ID info
+        qStr = SocketQuery(s, b'SCDP') #Request screen image
+        SocketClose(s)
+        print(len(qStr))
+        if len(qStr) == 0:
+            break
+    #SocketClose(s)
  
-    # Body: Open a socket, query the screen dump, save and close
-    s = SocketConnect()
-    qStr = SocketQuery(s, b'SCDP') #Request screen image
-    print(len(qStr))
-    f=open(file_name,'wb')
-    f.write(qStr)
-    f.flush()
-    f.close()
- 
-    SocketClose(s)
     sys.exit
  
 if __name__ == '__main__':
